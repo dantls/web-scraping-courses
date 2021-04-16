@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const CronJob = require('cron').CronJob
 const fs = require('fs');
 const path = require('path');
 
@@ -72,9 +73,11 @@ async function processCourses(browser, courses){
         
          return price
        });
+
        course['date'] = new Date;
   
        await browser.close();
+
       return course;
     })
     
@@ -84,4 +87,6 @@ async function processCourses(browser, courses){
     })  
 }
 
-initial()
+const job = CronJob('0 0 13 ? * MON-FRI *',initial());
+
+job.start();
