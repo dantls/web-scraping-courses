@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "cron": "^1.8.2",
     "puppeteer": "^8.0.0"
   },
   "devDependencies": {

@@ -1,11 +1,17 @@
 const puppeteer = require('puppeteer');
 const CronJob = require('cron').CronJob
 const fs = require('fs');
-const path = require('path');
+
 
 let courses = [];
 
 async function initial ()  {
+  const date = new Date()
+
+  console.log('Processo iniciado '+ 
+   date.getDate()+'/'+ date.getMonth() +' '+
+   date.getHours()+':'+ date.getMinutes())
+
   const browser = await puppeteer.launch();
  
   const urlPrincipal = 'https://rmanguinho.github.io/';
@@ -14,7 +20,7 @@ async function initial ()  {
 
   const courses = await loadCourses(page);
 
-  await processCourses(browser, courses)
+  await processCourses(courses)
 
   await browser.close();
 
@@ -57,9 +63,10 @@ async function readCourses(url){
 
   return courses;
 }
-async function processCourses(browser, courses){
+async function processCourses(courses){
 
-    const data = courses.map(async(course) => {
+    const data = courses.map(async(course,index) => {
+      console.log(`Processo ${index +1} executando`)
 
       const browser = await puppeteer.launch();
       const page = await browser.newPage();
@@ -80,13 +87,19 @@ async function processCourses(browser, courses){
 
       return course;
     })
-    
     Promise.all(data)
       .then(async valores => {  
          saveCourses(valores)
+         console.log('Processos finalizados')
     })  
 }
 
-const job = CronJob('0 0 13 ? * MON-FRI *',initial());
+
+let job = new CronJob('0 0 9 1-31 0-11 0-6', initial(), null 
+,true, 'America/Campo_Grande');
+
+let job2 = new CronJob('0 15 1-31 0-11 0-6', initial(), null 
+,true, 'America/Campo_Grande');
 
 job.start();
+job2.start();
