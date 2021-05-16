@@ -1,16 +1,21 @@
+require('dotenv').config()
 const puppeteer = require('puppeteer');
 const CronJob = require('cron').CronJob
-const fs = require('fs');
-
-
-let courses = [];
+const venom = require('venom-bot');
 
 async function initial ()  {
-  const date = new Date()
+  let client = null;
+  let date = new Date()
 
   console.log('Processo iniciado '+ 
-   date.getDate()+'/'+ date.getMonth() +' '+
-   date.getHours()+':'+ date.getMinutes())
+   String(date.getHours()).padStart(2,'0')
+   +':'+
+   String(date.getMinutes()).padStart(2,'0')
+   +' '+
+   String(date.getDate()).padStart(2,'0')
+   +'/'+
+   String(date.getMonth()+1).padStart(2,'0')
+  )
 
   const browser = await puppeteer.launch();
  
@@ -20,11 +25,26 @@ async function initial ()  {
 
   const courses = await loadCourses(page);
 
-  await processCourses(courses)
+  const coursesFormatted = await processCourses(courses)
 
   await browser.close();
 
+  if(!client){
+    client = await venom.create()
+  }
+
+  coursesFormatted.forEach(message => {
+      let textMessage = '*'+message.title+'*' +'\n'+
+      (message.old_price ? '_De:_ ' +'~'+message.old_price+'~' + "\n" : '')+
+      (message.percent ? '_Com:_ '+ message.percent + "\n" : '')+
+      '_Por:_ ' +message.price + "\n\n" +
+      '_'+message.src+'_' + "\n\n"
+      
+      sendMessage(client,textMessage)   
+    }
+  )
 }
+
 async function navigate(browser , url){
   const page = await browser.newPage();
  
@@ -48,58 +68,73 @@ async function loadCourses(page){
    return courses
 
 }
-async function saveCourses(courses){
-  fs.writeFileSync('discountCourses.json', JSON.stringify(courses, null, 2) , 
-      err => {
-      if (err) 
-        throw new Error('something went wrong');
-      console.log('Well Done');
-      }
-  )
-}
-async function readCourses(url){
-  const data = fs.readFileSync(url);
-  const courses = await JSON.parse(data);
-
-  return courses;
-}
 async function processCourses(courses){
 
-    const data = courses.map(async(course,index) => {
+    const data = courses.map(async(course,index,array) => {
       console.log(`Processo ${index +1} executando`)
 
       const browser = await puppeteer.launch();
       const page = await browser.newPage();
       await page.goto(course.src);
      
-       await page.waitForSelector('.price-text--price-part--Tu6MH',{timeout:5000});
-    
-       course['price'] = await page.evaluate(() => {
-        
-       const price = document.querySelector('.price-text--price-part--Tu6MH').children[1].children[0].innerText.split("R$")[1]      
-        
-         return price
-       });
+      await page.waitForSelector('.price-text--price-part--Tu6MH',{timeout:5000});
+      
+      course['price'] = await page.evaluate(() => {
+      
+      const price = document.querySelector('.price-text--price-part--Tu6MH')
+      .children[1]
+      .children[0]
+      .innerText.split("R$")[1]      
+      
+        return price
+      });
 
-       course['date'] = new Date;
-  
-       await browser.close();
+      if((array.length - 1) !== index) {
+        await page.waitForSelector('.price-text--original-price--2e-F5',{timeout:5000});
+        await page.waitForSelector('.udlite-clp-percent-discount',{timeout:5000});
+
+        course['old_price'] = await page.evaluate(() => {
+      
+        const old_price = document.querySelector('.price-text--original-price--2e-F5')
+          .children[0]
+          .children[1]
+          .children[0]
+          .children[0]
+          .innerText.split("R$")[1]    
+        
+          return old_price
+        });
+
+        course['percent'] = await page.evaluate(() => {
+        
+        const percent = document.querySelector('.udlite-clp-percent-discount')
+          .children[1]
+          .innerText.split(" ")[0]
+          
+          return percent
+        })
+      };
+
+      await browser.close();
 
       return course;
     })
-    Promise.all(data)
-      .then(async valores => {  
-         saveCourses(valores)
-         console.log('Processos finalizados')
-    })  
+    return await Promise.all(data)
+}
+function sendMessage(client, text) {
+  client
+    .sendText(`${process.env.USER_PHONE}@c.us`, text)
+    .then(() => {})
+    .catch((erro) => {
+      console.error('Erro ao enviar mensagem: ', erro);
+    });
 }
 
+let job = new CronJob(`${process.env.MINUTE1} ${process.env.HOUR1} 1-31 0-11 0-6`, initial, null 
+,true, `${process.env.LOCALE}`);
 
-let job = new CronJob('0 0 9 1-31 0-11 0-6', initial(), null 
-,true, 'America/Campo_Grande');
-
-let job2 = new CronJob('0 15 1-31 0-11 0-6', initial(), null 
-,true, 'America/Campo_Grande');
+let job2 = new CronJob(`${process.env.MINUTE2} ${process.env.HOUR2} 1-31 0-11 0-6`, initial, null 
+,true, `${process.env.LOCALE}`);
 
 job.start();
 job2.start();
