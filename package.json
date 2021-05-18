@@ -8,8 +8,5 @@
     "dotenv": "^9.0.2",
     "puppeteer": "^8.0.0",
     "venom-bot": "^3.0.14"
-  },
-  "devDependencies": {
-    "@types/puppeteer": "^5.4.3"
   }
 }
